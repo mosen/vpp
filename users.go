@@ -44,3 +44,11 @@ func (svc *usersService) GetUser() (*VPPUser, error) {
 func (svc *usersService) GetUsers() ([]VPPUser, error) {
 
 }
+
+func (svc *usersService) RetireUser(user *VPPUser) error {
+
+}
+
+func (svc *usersService) EditUser(user *VPPUser) error {
+
+}
