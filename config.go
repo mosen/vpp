@@ -2,18 +2,30 @@ package vpp
 
 import "net/url"
 
-type ServiceConfig struct {
-	InvitationEmailURL url.URL `json:"invitationEmailUrl"`
-	RegisterUserSrvURL url.URL `json:"registerUserSrvUrl"`
-	EditUserSrvURL url.URL `json:"editUserSrvUrl"`
-	GetUserSrvURL url.URL `json:"getUserSrvUrl"`
-	RetireUserSrvURL url.URL `json:"retireUserSrvUrl"`
-	GetUsersSrvURL url.URL `json:"getUsersSrvUrl"`
-	GetLicensesSrvURL url.URL `json:"getLicensesSrvUrl"`
-	AssociateLicenseSrvURL url.URL `json:"associateLicenseSrvUrl"`
-	DisassociateLicenseSrvURL url.URL `json:"disassociateLicenseSrvUrl"`
-}
+const (
+	serviceConfigPath = "VPPServiceConfigSrv"
+)
 
+type ServiceConfig struct {
+	InvitationEmailURL               string     `json:"invitationEmailUrl"`
+	RegisterUserSrvURL               string     `json:"registerUserSrvUrl"`
+	EditUserSrvURL                   string     `json:"editUserSrvUrl"`
+	GetUserSrvURL                    string     `json:"getUserSrvUrl"`
+	RetireUserSrvURL                 string     `json:"retireUserSrvUrl"`
+	GetUsersSrvURL                   string     `json:"getUsersSrvUrl"`
+	GetLicensesSrvURL                string     `json:"getLicensesSrvUrl"`
+	AssociateLicenseSrvURL           string     `json:"associateLicenseSrvUrl"`
+	DisassociateLicenseSrvURL        string     `json:"disassociateLicenseSrvUrl"`
+	ClientConfigSrvURL               string     `json:"clientConfigSrvUrl"`
+	ErrorCodes                       []VPPError `json:"errorCodes"`
+	GetVPPAssetsSrvURL               string     `json:"getVPPAssetsSrvUrl"`
+	InvitationEmailUrl               string     `json:"invitationEmailUrl"`
+	ManageVPPLicensesByAdamIdSrvURL  string     `json:"manageVPPLicensesByAdamIdSrvUrl"`
+	MaxBatchAssociateLicenseCount    int        `json:"maxBatchAssociateLicenseCount"`
+	MaxBatchDisassociateLicenseCount int        `json:"maxBatchDisassociateLicenseCount"`
+	Status                           int        `json:"status"`
+	VPPWebsiteUrl                    string     `json:"vppWebsiteUrl"`
+}
 
 type ConfigService interface {
 	ServiceConfig() (*ServiceConfig, error)
@@ -23,6 +35,18 @@ type configService struct {
 	client *vppClient
 }
 
-func (cs *configService) ServiceConfig() (*ServiceConfig, error) {
+func (s *configService) ServiceConfig() (*ServiceConfig, error) {
+	var response ServiceConfig
+	path, _ := url.Parse(serviceConfigPath)
+	u := s.client.BaseURL.ResolveReference(path)
+	req, err := s.client.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return nil, err
+	}
 
+	return &response, nil
 }

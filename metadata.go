@@ -1,7 +1,6 @@
 package vpp
 
 type MetadataService interface {
-
 }
 
 type metadataService struct {

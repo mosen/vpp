@@ -1,14 +1,14 @@
 package vpp
 
 import (
-	"net/url"
-	"net/http"
-	"fmt"
-	"time"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 )
 
@@ -20,24 +20,40 @@ const (
 )
 
 type SToken struct {
-	Token string `json:"token"`
-	ExpDate time.Time `json:"expDate"`
-	OrgName string `json:"orgName"`
+	Token      string `json:"token"`
+	ExpDateStr string `json:"expDate"`
+	OrgName    string `json:"orgName"`
+}
+
+func (t *SToken) Base64String() (string, error) {
+
+	jsonValue, err := json.Marshal(t)
+	if err != nil {
+		return "", err
+	}
+
+	buf := new(bytes.Buffer)
+	encoder := base64.NewEncoder(base64.StdEncoding, buf)
+	encoder.Write(jsonValue)
+	encoder.Close()
+
+	return string(buf.Bytes()), nil
 }
 
 type Config struct {
-	URL *url.URL
-	SToken *SToken
-	debug bool
+	URL           *url.URL
+	SToken        *SToken
+	debug         bool
+	serviceConfig *ServiceConfig
 }
 
 type VPPError struct {
-	Number int `json:"errorNumber,omitempty"`
-	Message string `json:"errorMessage,omitempty"`
+	ErrorMessage string `json:"errorMessage"`
+	ErrorNumber  int    `json:"errorNumber"`
 }
 
-func (v *VPPError) Err() string {
-	return fmt.Sprintf("%v: %v", v.Number, v.Message)
+func (e VPPError) Error() string {
+	return fmt.Sprintf("(%d) %s", e.ErrorNumber, e.ErrorMessage)
 }
 
 type VPPClient interface {
@@ -66,12 +82,11 @@ type vppClient struct {
 }
 
 func (c *vppClient) NewRequest(method, urlStr string, body interface{}) (*http.Request, error) {
-	rel, err := url.Parse(urlStr)
+	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, err
 	}
 
-	u := c.BaseURL.ResolveReference(rel)
 	buf := new(bytes.Buffer)
 	if body != nil {
 		err := json.NewEncoder(buf).Encode(body)
@@ -125,21 +140,25 @@ func decodeJSON(debug bool, body io.Reader, into interface{}) error {
 	return dec.Decode(into)
 }
 
-
 func NewVPPClient(config *Config) (VPPClient, error) {
 	if config.URL == nil {
 		config.URL, _ = url.Parse(defaultBaseURL)
 	}
 
 	c := &vppClient{client: http.DefaultClient, BaseURL: config.URL, Config: config}
-	c.assetsService = assetsService{client: c}
 	c.configService = configService{client: c}
+
+	serviceConfig, err := c.ServiceConfig()
+	if err != nil {
+		return nil, err
+	}
+	c.Config.serviceConfig = serviceConfig
+
+	c.assetsService = assetsService{client: c}
+
 	c.licensesService = licensesService{client: c}
 	c.metadataService = metadataService{client: c}
 	c.usersService = usersService{client: c}
 
 	return c, nil
 }
-
-
-
