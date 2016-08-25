@@ -36,28 +36,28 @@ func teardown() {
 
 }
 
-//func TestNewVPPClient(t *testing.T) {
-//	setup()
-//	defer teardown()
-//
-//	_, err := NewVPPClient(config)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//}
+func TestNewVPPClient(t *testing.T) {
+	setup()
+	defer teardown()
 
-//func TestConfigService_ServiceConfig(t *testing.T) {
-//	setup()
-//	defer teardown()
-//
-//	vppClient, err := NewVPPClient(config)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	_, err = vppClient.ServiceConfig()
-//	//fmt.Printf("%#v\n", sconfig)
-//}
+	_, err := NewVPPClient(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestConfigService_ServiceConfig(t *testing.T) {
+	setup()
+	defer teardown()
+
+	vppClient, err := NewVPPClient(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = vppClient.ServiceConfig()
+	//fmt.Printf("%#v\n", sconfig)
+}
 
 //func TestUsersService_RegisterUser(t *testing.T) {
 //	setup()
@@ -94,13 +94,69 @@ func TestUsersService_GetUser(t *testing.T) {
 	fmt.Printf("%#v\n", user)
 }
 
-//func TestSToken_Base64String(t *testing.T) {
-//	setup()
-//	defer teardown()
-//
-//	encoded, err := config.SToken.Base64String()
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	fmt.Printf("sToken encoded: %s\n", encoded)
-//}
+func TestUsersService_GetUsers(t *testing.T) {
+	setup()
+	defer teardown()
+
+	vppClient, err := NewVPPClient(config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	users, err := vppClient.GetUsers()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Printf("%#v\n", users)
+}
+
+func TestUsersService_RetireUser(t *testing.T) {
+	setup()
+	defer teardown()
+
+	vppClient, err := NewVPPClient(config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	user := &VPPUser{ClientUserIdStr: "b5497f2e-6d96-4ac6-8578-c96414433145"}
+	err = vppClient.RetireUser(user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Printf("%#v\n", user)
+}
+
+func TestUsersService_EditUser(t *testing.T) {
+	setup()
+	defer teardown()
+
+	vppClient, err := NewVPPClient(config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	user := &VPPUser{
+		ClientUserIdStr: "b5497f2e-6d96-4ac6-8578-c96414433145",
+		Email:           "updated@email",
+	}
+	err = vppClient.EditUser(user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Printf("%#v\n", user)
+}
+
+func TestSToken_Base64String(t *testing.T) {
+	setup()
+	defer teardown()
+
+	encoded, err := config.SToken.Base64String()
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("sToken encoded: %s\n", encoded)
+}

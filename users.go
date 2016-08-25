@@ -1,6 +1,7 @@
 package vpp
 
 import (
+	"errors"
 	"github.com/satori/go.uuid"
 )
 
@@ -10,6 +11,8 @@ const (
 	RegStatusRetired           = "Retired"
 )
 
+// VPPUser describes the attributes of a VPP user.
+// In most cases, ClientUserIdStr should be used over UserID
 type VPPUser struct {
 	UserID          int    `json:"userId,omitempty"`
 	Email           string `json:"email,omitempty"`
@@ -17,8 +20,11 @@ type VPPUser struct {
 	InviteURL       string `json:"inviteUrl,omitempty"`
 	InviteCode      string `json:"inviteCode,omitempty"`
 	ClientUserIdStr string `json:"clientUserIdStr,omitempty"`
+	ITSIdHash       string `json:"itsIdHash,omitempty"` // empty if no iTunes account has been associated
 }
 
+// NewUser creates a new user by generating a UUID.
+// Under normal circumstances you should use a UUID that is authoritative for your identity platform
 func NewUser(email string, id string) *VPPUser {
 	if id == "" {
 		id = uuid.NewV4().String()
@@ -29,9 +35,13 @@ func NewUser(email string, id string) *VPPUser {
 	}
 }
 
+// UsersService interface describes the methods available as part of the VPP user management API.
 type UsersService interface {
 	RegisterUser(user *VPPUser) (*VPPUser, error)
 	GetUser(*VPPUser) error
+	GetUsers(opts ...GetUsersOption) ([]VPPUser, error)
+	RetireUser(user *VPPUser) error
+	EditUser(user *VPPUser) error
 }
 
 type usersService struct {
@@ -49,6 +59,7 @@ type registerVPPUserSrvResponse struct {
 	*VPPError
 }
 
+// RegisterUser registers a new VPP user
 func (s *usersService) RegisterUser(user *VPPUser) (*VPPUser, error) {
 	sToken, err := s.client.Config.SToken.Base64String()
 	if err != nil {
@@ -90,6 +101,7 @@ type getVPPUserSrvResponse struct {
 	*VPPError
 }
 
+// GetUser gets any number of users associated with the given ClientIdStr
 func (s *usersService) GetUser(user *VPPUser) error {
 	sToken, err := s.client.Config.SToken.Base64String()
 	if err != nil {
@@ -124,15 +136,183 @@ func (s *usersService) GetUser(user *VPPUser) error {
 	return nil
 }
 
-//
-//func (svc *usersService) GetUsers() ([]VPPUser, error) {
-//
-//}
-//
-//func (svc *usersService) RetireUser(user *VPPUser) error {
-//
-//}
-//
-//func (svc *usersService) EditUser(user *VPPUser) error {
-//
-//}
+type getUsersRequestOpts struct {
+	BatchToken         string `json:"batchToken,omitempty"`
+	SinceModifiedToken string `json:"sinceModifiedToken,omitempty"`
+	IncludeRetired     int    `json:"includeRetired"`
+}
+
+// GetUsersOption describes the signature of the closure returned by a function adding an argument to GetUsers
+type GetUsersOption func(*getUsersRequestOpts) error
+
+// BatchToken is an argument given to GetUsers when fetching many records in batches
+func BatchToken(batchToken string) GetUsersOption {
+	return func(opts *getUsersRequestOpts) error {
+		if batchToken == "" {
+			return errors.New("no batch token given")
+		}
+		opts.BatchToken = batchToken
+		return nil
+	}
+}
+
+// SinceModifiedToken is an argument given to GetUsers when fetching users that have changed since the last query
+func SinceModifiedToken(sinceModifiedToken string) GetUsersOption {
+	return func(opts *getUsersRequestOpts) error {
+		if sinceModifiedToken == "" {
+			return errors.New("no since modified token given")
+		}
+		opts.SinceModifiedToken = sinceModifiedToken
+		return nil
+	}
+}
+
+// IncludeRetired is an argument given to GetUsers to include users that have been retired.
+// Retiring a user disassociates a VPP user ID from its iTunes account and releases all revocable licenses.
+func IncludeRetired(include bool) GetUsersOption {
+	return func(opts *getUsersRequestOpts) error {
+		if include == true {
+			opts.IncludeRetired = 1
+		} else {
+			opts.IncludeRetired = 0
+		}
+		return nil
+	}
+}
+
+type getVPPUsersSrvRequest struct {
+	*getUsersRequestOpts
+	SToken string `json:"sToken"`
+}
+
+type getVPPUsersSrvResponse struct {
+	Status     int       `json:"status,omitempty"`
+	Users      []VPPUser `json:"users,omitempty"`
+	TotalCount int       `json:"totalCount,omitempty"` // An estimate of the records returned. Will not appear if batchToken exists
+	*VPPError
+	BatchToken         string `json:"batchToken,omitempty"`
+	SinceModifiedToken string `json:"sinceModifiedToken,omitempty"`
+}
+
+// BatchResult represents a paged result
+type BatchResult interface {
+	Result() ([]interface{}, error)
+	HasNext() bool
+}
+
+// GetUsers obtains a list of all known users from the VPP server
+func (s *usersService) GetUsers(opts ...GetUsersOption) ([]VPPUser, error) {
+	sToken, err := s.client.Config.SToken.Base64String()
+	if err != nil {
+		return nil, err
+	}
+	requestOpts := &getUsersRequestOpts{}
+	for _, option := range opts {
+		if err := option(requestOpts); err != nil {
+			return nil, err
+		}
+	}
+	var request *getVPPUsersSrvRequest = &getVPPUsersSrvRequest{
+		getUsersRequestOpts: requestOpts,
+		SToken:              sToken,
+	}
+	var response getVPPUsersSrvResponse
+	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.GetUsersSrvURL, request)
+	if err != nil {
+		return nil, err
+	}
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return nil, err
+	}
+	if response.Status == -1 {
+		return nil, response.VPPError
+	}
+	return response.Users, nil
+}
+
+type retireVPPUserSrvRequest struct {
+	UserId          int    `json:"userId,omitempty"`
+	ClientUserIDStr string `json:"clientUserIdStr,omitempty"`
+	SToken          string `json:"sToken"`
+}
+
+type retireVPPUserSrvResponse struct {
+	Status int      `json:"status,omitempty"`
+	User   *VPPUser `json:"user,omitempty"`
+	*VPPError
+}
+
+// RetireUser disassociates our user id with an itunes user id. All revocable licenses are then freed.
+func (s *usersService) RetireUser(user *VPPUser) error {
+	sToken, err := s.client.Config.SToken.Base64String()
+	if err != nil {
+		return err
+	}
+	var response *retireVPPUserSrvResponse
+	var request *retireVPPUserSrvRequest = &retireVPPUserSrvRequest{
+		UserId:          user.UserID,
+		ClientUserIDStr: user.ClientUserIdStr,
+		SToken:          sToken,
+	}
+	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.RetireUserSrvURL, request)
+	if err != nil {
+		return err
+	}
+
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return err
+	}
+
+	if response.Status == -1 {
+		return response.VPPError
+	}
+
+	user.Status = response.User.Status
+	return nil
+}
+
+type editVPPUserSrvRequest struct {
+	UserId          int    `json:"userId,omitempty"`
+	ClientUserIDStr string `json:"clientUserIdStr,omitempty"`
+	Email           string `json:"email"`
+	SToken          string `json:"sToken"`
+}
+
+type editVPPUserSrvResponse struct {
+	Status int      `json:"status,omitempty"`
+	User   *VPPUser `json:"user,omitempty"`
+	*VPPError
+}
+
+// EditUser edits the e-mail address associated with a user
+func (s *usersService) EditUser(user *VPPUser) error {
+	sToken, err := s.client.Config.SToken.Base64String()
+	if err != nil {
+		return err
+	}
+	var response *editVPPUserSrvResponse
+	var request *editVPPUserSrvRequest = &editVPPUserSrvRequest{
+		UserId:          user.UserID,
+		ClientUserIDStr: user.ClientUserIdStr,
+		Email:           user.Email,
+		SToken:          sToken,
+	}
+	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.EditUserSrvURL, request)
+	if err != nil {
+		return err
+	}
+
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return err
+	}
+
+	if response.Status == -1 {
+		return response.VPPError
+	}
+
+	user = response.User
+	return nil
+}
