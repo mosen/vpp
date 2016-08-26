@@ -19,6 +19,13 @@ const (
 	mediaType      = "application/json;charset=UTF8"
 )
 
+type Status int
+
+const (
+	StatusErr Status = iota - 1
+	StatusOk
+)
+
 type SToken struct {
 	Token      string `json:"token"`
 	ExpDateStr string `json:"expDate"`

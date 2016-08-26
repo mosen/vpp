@@ -10,16 +10,15 @@ var (
 	config     *Config
 	expDateStr string
 	//expDate time.Time
-	vppSimURL *url.URL
+	vppSimURL          *url.URL
+	clientIdStrFixture string
 )
 
 func setup() {
-	expDateStr = "2017-08-24T22:11:47+10:00"
-	//expDate = time.Parse("", expDateStr)
-
-	//expDate = time.Now()
-	//expDate = expDate.AddDate(1, 0, 0)
+	// If you want to use VPPsim, you have to paste the expDate time here
+	expDateStr = "2017-08-26T10:24:11+10:00"
 	vppSimURL, _ = url.Parse("http://localhost:9001")
+	clientIdStrFixture = "eefe2e28-2f64-46ce-9bf5-726f5eda50a0"
 
 	config = &Config{
 		URL: vppSimURL,
@@ -59,22 +58,31 @@ func TestConfigService_ServiceConfig(t *testing.T) {
 	//fmt.Printf("%#v\n", sconfig)
 }
 
-//func TestUsersService_RegisterUser(t *testing.T) {
-//	setup()
-//	defer teardown()
-//
-//	vppClient, err := NewVPPClient(config)
-//	if err != nil {
-//		t.Error(err)
-//	}
-//
-//	user := NewUser("test@localhost", "")
-//	vppUser, err := vppClient.RegisterUser(user)
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	fmt.Printf("%#v\n", vppUser)
-//}
+func TestUsersService_RegisterUser(t *testing.T) {
+	setup()
+	defer teardown()
+
+	vppClient, err := NewVPPClient(config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	user := NewUser("test@localhost", clientIdStrFixture)
+	vppUser, err := vppClient.RegisterUser(user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if vppUser.UserID == 0 {
+		t.Error("Expected UserId but got empty value")
+	}
+
+	if vppUser.Status != RegStatusRegistered {
+		t.Errorf("Expected status registered but got %s", vppUser.Status)
+	}
+
+	t.Logf("Registered user successfully with ClientIDStr: %s", vppUser.ClientUserIdStr)
+}
 
 func TestUsersService_GetUser(t *testing.T) {
 	setup()
@@ -85,7 +93,7 @@ func TestUsersService_GetUser(t *testing.T) {
 		t.Error(err)
 	}
 
-	user := &VPPUser{ClientUserIdStr: "b5497f2e-6d96-4ac6-8578-c96414433145"}
+	user := &VPPUser{ClientUserIdStr: clientIdStrFixture}
 	err = vppClient.GetUser(user)
 	if err != nil {
 		t.Error(err)
@@ -103,12 +111,12 @@ func TestUsersService_GetUsers(t *testing.T) {
 		t.Error(err)
 	}
 
-	users, err := vppClient.GetUsers()
+	_, err = vppClient.GetUsers()
 	if err != nil {
 		t.Error(err)
 	}
 
-	fmt.Printf("%#v\n", users)
+	//fmt.Printf("%#v\n", users)
 }
 
 func TestUsersService_RetireUser(t *testing.T) {
@@ -120,7 +128,7 @@ func TestUsersService_RetireUser(t *testing.T) {
 		t.Error(err)
 	}
 
-	user := &VPPUser{ClientUserIdStr: "b5497f2e-6d96-4ac6-8578-c96414433145"}
+	user := &VPPUser{ClientUserIdStr: clientIdStrFixture}
 	err = vppClient.RetireUser(user)
 	if err != nil {
 		t.Error(err)
@@ -139,15 +147,13 @@ func TestUsersService_EditUser(t *testing.T) {
 	}
 
 	user := &VPPUser{
-		ClientUserIdStr: "b5497f2e-6d96-4ac6-8578-c96414433145",
+		ClientUserIdStr: clientIdStrFixture,
 		Email:           "updated@email",
 	}
 	err = vppClient.EditUser(user)
 	if err != nil {
 		t.Error(err)
 	}
-
-	fmt.Printf("%#v\n", user)
 }
 
 func TestSToken_Base64String(t *testing.T) {
@@ -159,4 +165,24 @@ func TestSToken_Base64String(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Printf("sToken encoded: %s\n", encoded)
+}
+
+func TestLicensesService_GetLicenses(t *testing.T) {
+	setup()
+	defer teardown()
+
+	setup()
+	defer teardown()
+
+	vppClient, err := NewVPPClient(config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	licenses, err := vppClient.GetLicenses()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Printf("%#v\n", licenses)
 }

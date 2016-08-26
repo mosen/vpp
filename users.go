@@ -1,7 +1,6 @@
 package vpp
 
 import (
-	"errors"
 	"github.com/satori/go.uuid"
 )
 
@@ -54,7 +53,7 @@ type registerVPPUserSrvRequest struct {
 }
 
 type registerVPPUserSrvResponse struct {
-	Status int      `json:"status,omitempty"`
+	Status Status   `json:"status,omitempty"`
 	User   *VPPUser `json:"user,omitempty"`
 	*VPPError
 }
@@ -81,7 +80,7 @@ func (s *usersService) RegisterUser(user *VPPUser) (*VPPUser, error) {
 		return nil, err
 	}
 
-	if response.Status == -1 {
+	if response.Status == StatusErr {
 		return nil, response.VPPError
 	}
 
@@ -96,7 +95,7 @@ type getVPPUserSrvRequest struct {
 }
 
 type getVPPUserSrvResponse struct {
-	Status int      `json:"status,omitempty"`
+	Status Status   `json:"status,omitempty"`
 	User   *VPPUser `json:"user,omitempty"`
 	*VPPError
 }
@@ -123,7 +122,7 @@ func (s *usersService) GetUser(user *VPPUser) error {
 		return err
 	}
 
-	if response.Status == -1 {
+	if response.Status == StatusErr {
 		return response.VPPError
 	}
 
@@ -137,35 +136,12 @@ func (s *usersService) GetUser(user *VPPUser) error {
 }
 
 type getUsersRequestOpts struct {
-	BatchToken         string `json:"batchToken,omitempty"`
-	SinceModifiedToken string `json:"sinceModifiedToken,omitempty"`
-	IncludeRetired     int    `json:"includeRetired"`
+	*BatchRequestOpts
+	IncludeRetired int `json:"includeRetired"`
 }
 
 // GetUsersOption describes the signature of the closure returned by a function adding an argument to GetUsers
 type GetUsersOption func(*getUsersRequestOpts) error
-
-// BatchToken is an argument given to GetUsers when fetching many records in batches
-func BatchToken(batchToken string) GetUsersOption {
-	return func(opts *getUsersRequestOpts) error {
-		if batchToken == "" {
-			return errors.New("no batch token given")
-		}
-		opts.BatchToken = batchToken
-		return nil
-	}
-}
-
-// SinceModifiedToken is an argument given to GetUsers when fetching users that have changed since the last query
-func SinceModifiedToken(sinceModifiedToken string) GetUsersOption {
-	return func(opts *getUsersRequestOpts) error {
-		if sinceModifiedToken == "" {
-			return errors.New("no since modified token given")
-		}
-		opts.SinceModifiedToken = sinceModifiedToken
-		return nil
-	}
-}
 
 // IncludeRetired is an argument given to GetUsers to include users that have been retired.
 // Retiring a user disassociates a VPP user ID from its iTunes account and releases all revocable licenses.
@@ -186,18 +162,12 @@ type getVPPUsersSrvRequest struct {
 }
 
 type getVPPUsersSrvResponse struct {
-	Status     int       `json:"status,omitempty"`
+	Status     Status    `json:"status,omitempty"`
 	Users      []VPPUser `json:"users,omitempty"`
 	TotalCount int       `json:"totalCount,omitempty"` // An estimate of the records returned. Will not appear if batchToken exists
 	*VPPError
 	BatchToken         string `json:"batchToken,omitempty"`
 	SinceModifiedToken string `json:"sinceModifiedToken,omitempty"`
-}
-
-// BatchResult represents a paged result
-type BatchResult interface {
-	Result() ([]interface{}, error)
-	HasNext() bool
 }
 
 // GetUsers obtains a list of all known users from the VPP server
@@ -225,7 +195,7 @@ func (s *usersService) GetUsers(opts ...GetUsersOption) ([]VPPUser, error) {
 	if err != nil {
 		return nil, err
 	}
-	if response.Status == -1 {
+	if response.Status == StatusErr {
 		return nil, response.VPPError
 	}
 	return response.Users, nil
@@ -238,7 +208,7 @@ type retireVPPUserSrvRequest struct {
 }
 
 type retireVPPUserSrvResponse struct {
-	Status int      `json:"status,omitempty"`
+	Status Status   `json:"status,omitempty"`
 	User   *VPPUser `json:"user,omitempty"`
 	*VPPError
 }
@@ -265,7 +235,7 @@ func (s *usersService) RetireUser(user *VPPUser) error {
 		return err
 	}
 
-	if response.Status == -1 {
+	if response.Status == StatusErr {
 		return response.VPPError
 	}
 
@@ -281,7 +251,7 @@ type editVPPUserSrvRequest struct {
 }
 
 type editVPPUserSrvResponse struct {
-	Status int      `json:"status,omitempty"`
+	Status Status   `json:"status,omitempty"`
 	User   *VPPUser `json:"user,omitempty"`
 	*VPPError
 }
@@ -309,7 +279,7 @@ func (s *usersService) EditUser(user *VPPUser) error {
 		return err
 	}
 
-	if response.Status == -1 {
+	if response.Status == StatusErr {
 		return response.VPPError
 	}
 
