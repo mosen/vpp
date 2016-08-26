@@ -1,12 +1,5 @@
 package vpp
 
-type VPPAsset struct {
-	AdamID          string `json:"adamIdStr,omitempty"`
-	ProductTypeID   int    `json:"productTypeId,omitempty"`
-	PricingParam    string `json:"pricingParam,omitempty"`
-	ProductTypeName string `json:"productTypeName"`
-}
-
 // VPPLicense describes a licensed product (VPPAsset) and its (optional) association with a VPP User.
 type VPPLicense struct {
 	LicenseID     string `json:"licenseIdStr,omitempty"`
@@ -39,6 +32,7 @@ type getVPPLicensesSrvResponse struct {
 // LicensesService describes an interface that can manage VPP licenses
 type LicensesService interface {
 	GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, error)
+	AssociateLicense(user *VPPUser, license *VPPLicense) error
 }
 
 type licensesService struct {
@@ -48,9 +42,9 @@ type licensesService struct {
 
 type getLicensesRequestOpts struct {
 	*BatchRequestOpts
-	AssignedOnly bool   `json:"assignedOnly,omitempty"`
-	AdamID       int    `json:"adamId,omitempty"`
-	PricingParam string `json:"pricingParam,omitempty"`
+	AssignedOnly bool         `json:"assignedOnly,omitempty"`
+	AdamID       int          `json:"adamId,omitempty"`
+	PricingParam PricingParam `json:"pricingParam,omitempty"`
 }
 
 // GetLicensesOption describes the signature of the closure returned by a function adding an argument to GetLicenses
@@ -85,8 +79,8 @@ func (s *licensesService) GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, 
 }
 
 type manageVPPLicensesByAdamIdSrvRequest struct {
-	AdamIDStr    string `json:"adamIdStr"`
-	PricingParam string `json:"pricingParam"`
+	AdamIDStr    string       `json:"adamIdStr"`
+	PricingParam PricingParam `json:"pricingParam"`
 
 	// Only one of the below is required
 	AssociateClientIDStrs  []string `json:"associateClientIdStrs,omitempty"`
@@ -105,7 +99,7 @@ type manageVPPLicensesByAdamIdSrvResponse struct {
 	Status          Status               `json:"status"`
 	AdamIDStr       string               `json:"adamIdStr"`
 	ProductTypeID   int                  `json:"productTypeId"`
-	PricingParam    string               `json:"pricingParam"`
+	PricingParam    PricingParam         `json:"pricingParam"`
 	ProductTypeName string               `json:"productTypeName"`
 	IsIrrevocable   bool                 `json:"isIrrevocable"`
 	Associations    []LicenseAssociation `json:"associations,omitempty"`
@@ -113,6 +107,101 @@ type manageVPPLicensesByAdamIdSrvResponse struct {
 }
 
 // ManageLicenses is used for the bulk addition/removal of VPP licenses.
-func (s *licensesService) ManageLicenses(asset *VPPAsset, associations []LicenseAssociation, disassociations []LicenseAssociation, notify bool) ([]LicenseAssociation, error) {
+//func (s *licensesService) ManageLicenses(asset *VPPAsset, associations []LicenseAssociation, disassociations []LicenseAssociation, notify bool) ([]LicenseAssociation, error) {
+//
+//}
 
+type associateVPPLicenseWithVPPUserSrvRequest struct {
+	UserID       int          `json:"userId,omitempty"`
+	ClientUserID string       `json:"clientUserIdStr,omitempty"`
+	AdamID       string       `json:"adamId,omitempty"`
+	LicenseID    string       `json:"licenseId,omitempty"`
+	PricingParam PricingParam `json:"pricingParam,omitempty"`
+	SToken       string       `json:"sToken"`
+}
+
+type associateVPPLicenseWithVPPUserSrvResponse struct {
+	Status  Status      `json:"status"`
+	License *VPPLicense `json:"license,omitempty"` // TODO: user also included in this object, should we parse it?
+	User    *VPPUser    `json:"user,omitempty"`
+	*VPPError
+}
+
+// DEPRECATED: Associate an (available) VPP license with a MDM system user.
+func (s *licensesService) AssociateLicense(user *VPPUser, license *VPPLicense) error {
+	var response *associateVPPLicenseWithVPPUserSrvResponse
+	var request *associateVPPLicenseWithVPPUserSrvRequest = &associateVPPLicenseWithVPPUserSrvRequest{
+		SToken: s.sToken,
+	}
+
+	// UserID takes precedence over ClientUserID
+	if user.UserID != 0 {
+		request.UserID = user.UserID
+	} else {
+		request.ClientUserID = user.ClientUserIdStr
+	}
+
+	// LicenseID takes precedence over AdamID
+	if license.LicenseID != "" {
+		request.LicenseID = license.LicenseID
+	} else {
+		request.AdamID = license.AdamID
+	}
+
+	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.AssociateLicenseSrvURL, request)
+	if err != nil {
+		return err
+	}
+
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return err
+	}
+
+	if response.Status == StatusErr {
+		return response.VPPError
+	}
+
+	user.Status = response.User.Status
+	return nil
+}
+
+type disassociateVPPLicenseFromVPPUserSrvRequest struct {
+	UserID    int    `json:"userId"`
+	LicenseID string `json:"licenseId"`
+	SToken    string `json:"sToken"`
+}
+
+type disassociateVPPLicenseFromVPPUserSrvResponse struct {
+	Status  Status      `json:"status"`
+	License *VPPLicense `json:"license,omitempty"`
+	User    *VPPUser    `json:"user,omitempty"`
+	*VPPError
+}
+
+// DEPRECATED: Disassociate a license from a VPP user.
+func (s *licensesService) DisassociateLicense(user *VPPUser, license *VPPLicense) error {
+	var response *disassociateVPPLicenseFromVPPUserSrvResponse
+	var request *disassociateVPPLicenseFromVPPUserSrvRequest = &disassociateVPPLicenseFromVPPUserSrvRequest{
+		UserID:    user.UserID,
+		LicenseID: license.LicenseID,
+		SToken:    s.sToken,
+	}
+
+	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.DisassociateLicenseSrvURL, request)
+	if err != nil {
+		return err
+	}
+
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return err
+	}
+
+	if response.Status == StatusErr {
+		return response.VPPError
+	}
+
+	user.Status = response.User.Status
+	return nil
 }
