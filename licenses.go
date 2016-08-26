@@ -1,5 +1,7 @@
 package vpp
 
+import "errors"
+
 // VPPLicense describes a licensed product (VPPAsset) and its (optional) association with a VPP User.
 type VPPLicense struct {
 	LicenseID     string `json:"licenseIdStr,omitempty"`
@@ -104,6 +106,51 @@ type manageVPPLicensesByAdamIdSrvResponse struct {
 	IsIrrevocable   bool                 `json:"isIrrevocable"`
 	Associations    []LicenseAssociation `json:"associations,omitempty"`
 	Disassociations []LicenseAssociation `json:"disassociations,omitempty"`
+}
+
+type licenseOperations struct {
+	Asset *VPPAsset
+
+	AssociateUsers         []VPPUser
+	AssociateSerialNumbers []string
+
+	DisassociateUsers         []VPPUser
+	DisassociateSerialNumbers []string
+	DisassociateLicenseIDs    []string
+}
+
+// NewLicenseOperations creates a new batch of license operations (assigning/freeing)
+func (op *licenseOperations) NewLicenseOperations(asset *VPPAsset) licenseOperations {
+	return &licenseOperations{
+		Asset: asset,
+	}
+}
+
+// AssignUser adds a VPP user to the list of license holders
+func (op *licenseOperations) AssignUser(user *VPPUser) error {
+	if len(op.AssociateSerialNumbers) > 0 {
+		return errors.New("you cannot assign licenses to both users and devices in the same license operation")
+	}
+
+	op.AssociateUsers = append(op.AssociateUsers, user)
+	return nil
+}
+
+func (op *licenseOperations) AssignSerialNumber(serialNumber string) error {
+	if len(op.AssociateUsers) > 0 {
+		return errors.New("you cannot assign licenses to both users and devices in the same license operation")
+	}
+
+	op.AssociateSerialNumbers = append(op.AssociateSerialNumbers, serialNumber)
+	return nil
+}
+
+func (op *licenseOperations) UnassignUser(user *VPPUser) error {
+
+}
+
+func (op *licenseOperations) UnassignSerialNumber(serialNumber string) error {
+
 }
 
 // ManageLicenses is used for the bulk addition/removal of VPP licenses.
