@@ -1,6 +1,10 @@
 package vpp
 
-import "net/url"
+import (
+	"encoding/json"
+	"github.com/satori/go.uuid"
+	"net/url"
+)
 
 const (
 	serviceConfigPath = "VPPServiceConfigSrv"
@@ -27,8 +31,25 @@ type ServiceConfig struct {
 	VPPWebsiteUrl                    string     `json:"vppWebsiteUrl"`
 }
 
+// ClientContext represents the information about the current MDM which is stored with the VPP service to ensure
+// that two MDM services are not managing the same VPP account.
+type ClientContext struct {
+	Hostname string `json:"hostname,omitempty"`
+	GUID     string `json:"guid,omitempty"`
+}
+
+func NewClientContext(hostname string) *ClientContext {
+	guid := uuid.NewV4()
+	return &ClientContext{
+		Hostname: hostname,
+		GUID:     guid.String(),
+	}
+}
+
 type ConfigService interface {
 	ServiceConfig() (*ServiceConfig, error)
+	ClientContext() (string, error)
+	UpdateClientContext(clientContext *ClientContext) (string, error)
 }
 
 type configService struct {
@@ -49,4 +70,82 @@ func (s *configService) ServiceConfig() (*ServiceConfig, error) {
 	}
 
 	return &response, nil
+}
+
+type vppClientConfigSrvRequest struct {
+	ClientContext string `json:"clientContext,omitempty"`
+	SToken        string `json:"sToken"`
+}
+
+type vppClientConfigSrvResponse struct {
+	Status        Status `json:"status"`
+	ClientContext string `json:"clientContext,omitempty"`
+	CountryCode   string `json:"countryCode,omitempty"`
+	*VPPError
+}
+
+// ClientContext retrieves the current clientContext value by posting an empty request to clientConfigSrvURL.
+func (s *configService) ClientContext() (string, error) {
+	sToken, err := s.client.Config.SToken.Base64String()
+	if err != nil {
+		return "", err
+	}
+	var response *vppClientConfigSrvResponse
+	var request *vppClientConfigSrvRequest = &vppClientConfigSrvRequest{
+		SToken: sToken,
+	}
+
+	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.ClientConfigSrvURL, request)
+	if err != nil {
+		return "", err
+	}
+
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return "", err
+	}
+
+	if response.Status == StatusErr {
+		return "", response.VPPError
+	}
+
+	return response.ClientContext, nil
+}
+
+// UpdateClientContext updates the clientContext with the VPP Service.
+// The clientContext is used to indicate which product is managing this VPP account so that two products are not
+// simultaneously attempting to associate/disassociate licenses.
+func (s *configService) UpdateClientContext(clientContext *ClientContext) (string, error) {
+	sToken, err := s.client.Config.SToken.Base64String()
+	if err != nil {
+		return "", err
+	}
+
+	var clientContextBytes []byte
+	clientContextBytes, err = json.Marshal(&clientContext)
+	if err != nil {
+		return "", err
+	}
+
+	var response *vppClientConfigSrvResponse
+	var request *vppClientConfigSrvRequest = &vppClientConfigSrvRequest{
+		ClientContext: string(clientContextBytes),
+		SToken:        sToken,
+	}
+
+	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.ClientConfigSrvURL, request)
+	if err != nil {
+		return "", err
+	}
+
+	err = s.client.Do(req, &response)
+	if err != nil {
+		return "", err
+	}
+
+	if response.Status == StatusErr {
+		return "", response.VPPError
+	}
+
+	return response.CountryCode, nil
 }
