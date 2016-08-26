@@ -54,6 +54,7 @@ type ConfigService interface {
 
 type configService struct {
 	client *vppClient
+	sToken string
 }
 
 func (s *configService) ServiceConfig() (*ServiceConfig, error) {
@@ -86,13 +87,9 @@ type vppClientConfigSrvResponse struct {
 
 // ClientContext retrieves the current clientContext value by posting an empty request to clientConfigSrvURL.
 func (s *configService) ClientContext() (string, error) {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return "", err
-	}
 	var response *vppClientConfigSrvResponse
 	var request *vppClientConfigSrvRequest = &vppClientConfigSrvRequest{
-		SToken: sToken,
+		SToken: s.sToken,
 	}
 
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.ClientConfigSrvURL, request)
@@ -116,13 +113,8 @@ func (s *configService) ClientContext() (string, error) {
 // The clientContext is used to indicate which product is managing this VPP account so that two products are not
 // simultaneously attempting to associate/disassociate licenses.
 func (s *configService) UpdateClientContext(clientContext *ClientContext) (string, error) {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return "", err
-	}
-
 	var clientContextBytes []byte
-	clientContextBytes, err = json.Marshal(&clientContext)
+	clientContextBytes, err := json.Marshal(&clientContext)
 	if err != nil {
 		return "", err
 	}
@@ -130,7 +122,7 @@ func (s *configService) UpdateClientContext(clientContext *ClientContext) (strin
 	var response *vppClientConfigSrvResponse
 	var request *vppClientConfigSrvRequest = &vppClientConfigSrvRequest{
 		ClientContext: string(clientContextBytes),
-		SToken:        sToken,
+		SToken:        s.sToken,
 	}
 
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.ClientConfigSrvURL, request)

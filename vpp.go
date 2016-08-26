@@ -147,13 +147,18 @@ func decodeJSON(debug bool, body io.Reader, into interface{}) error {
 	return dec.Decode(into)
 }
 
-func NewVPPClient(config *Config) (VPPClient, error) {
+func NewVPPClient(config *Config) (*VPPClient, error) {
 	if config.URL == nil {
 		config.URL, _ = url.Parse(defaultBaseURL)
 	}
 
 	c := &vppClient{client: http.DefaultClient, BaseURL: config.URL, Config: config}
-	c.configService = configService{client: c}
+	sToken, err := config.SToken.Base64String()
+	if err != nil {
+		return nil, err
+	}
+
+	c.configService = configService{client: c, sToken: sToken}
 
 	serviceConfig, err := c.ServiceConfig()
 	if err != nil {
@@ -161,11 +166,11 @@ func NewVPPClient(config *Config) (VPPClient, error) {
 	}
 	c.Config.serviceConfig = serviceConfig
 
-	c.assetsService = assetsService{client: c}
+	c.assetsService = assetsService{client: c, sToken: sToken}
 
-	c.licensesService = licensesService{client: c}
-	c.metadataService = metadataService{client: c}
-	c.usersService = usersService{client: c}
+	c.licensesService = licensesService{client: c, sToken: sToken}
+	c.metadataService = metadataService{client: c, sToken: sToken}
+	c.usersService = usersService{client: c, sToken: sToken}
 
 	return c, nil
 }

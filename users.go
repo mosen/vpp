@@ -45,6 +45,7 @@ type UsersService interface {
 
 type usersService struct {
 	client *vppClient
+	sToken string
 }
 
 type registerVPPUserSrvRequest struct {
@@ -102,14 +103,10 @@ type getVPPUserSrvResponse struct {
 
 // GetUser gets any number of users associated with the given ClientIdStr
 func (s *usersService) GetUser(user *VPPUser) error {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return err
-	}
 	var response *getVPPUserSrvResponse
 	var request *getVPPUserSrvRequest = &getVPPUserSrvRequest{
 		ClientUserIdStr: user.ClientUserIdStr,
-		SToken:          sToken,
+		SToken:          s.sToken,
 	}
 
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.GetUserSrvURL, request)
@@ -172,10 +169,6 @@ type getVPPUsersSrvResponse struct {
 
 // GetUsers obtains a list of all known users from the VPP server
 func (s *usersService) GetUsers(opts ...GetUsersOption) ([]VPPUser, error) {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return nil, err
-	}
 	requestOpts := &getUsersRequestOpts{}
 	for _, option := range opts {
 		if err := option(requestOpts); err != nil {
@@ -184,7 +177,7 @@ func (s *usersService) GetUsers(opts ...GetUsersOption) ([]VPPUser, error) {
 	}
 	var request *getVPPUsersSrvRequest = &getVPPUsersSrvRequest{
 		getUsersRequestOpts: requestOpts,
-		SToken:              sToken,
+		SToken:              s.sToken,
 	}
 	var response getVPPUsersSrvResponse
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.GetUsersSrvURL, request)
@@ -215,15 +208,11 @@ type retireVPPUserSrvResponse struct {
 
 // RetireUser disassociates our user id with an itunes user id. All revocable licenses are then freed.
 func (s *usersService) RetireUser(user *VPPUser) error {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return err
-	}
 	var response *retireVPPUserSrvResponse
 	var request *retireVPPUserSrvRequest = &retireVPPUserSrvRequest{
 		UserId:          user.UserID,
 		ClientUserIDStr: user.ClientUserIdStr,
-		SToken:          sToken,
+		SToken:          s.sToken,
 	}
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.RetireUserSrvURL, request)
 	if err != nil {
@@ -258,16 +247,12 @@ type editVPPUserSrvResponse struct {
 
 // EditUser edits the e-mail address associated with a user
 func (s *usersService) EditUser(user *VPPUser) error {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return err
-	}
 	var response *editVPPUserSrvResponse
 	var request *editVPPUserSrvRequest = &editVPPUserSrvRequest{
 		UserId:          user.UserID,
 		ClientUserIDStr: user.ClientUserIdStr,
 		Email:           user.Email,
-		SToken:          sToken,
+		SToken:          s.sToken,
 	}
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.EditUserSrvURL, request)
 	if err != nil {

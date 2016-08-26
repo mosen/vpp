@@ -18,6 +18,7 @@ type AssetsService interface {
 
 type assetsService struct {
 	client *vppClient
+	sToken string
 }
 
 func (as *assetsService) GetAssets() {

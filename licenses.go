@@ -1,14 +1,21 @@
 package vpp
 
-type VPPLicense struct {
-	LicenseID       string `json:"licenseIdStr,omitempty"`
-	AdamID          string `json:"adamId,omitempty"`
+type VPPAsset struct {
+	AdamID          string `json:"adamIdStr,omitempty"`
 	ProductTypeID   int    `json:"productTypeId,omitempty"`
 	PricingParam    string `json:"pricingParam,omitempty"`
 	ProductTypeName string `json:"productTypeName"`
-	IsIrrevocable   bool   `json:"isIrrevocable"`
 }
 
+// VPPLicense describes a licensed product (VPPAsset) and its (optional) association with a VPP User.
+type VPPLicense struct {
+	LicenseID     string `json:"licenseIdStr,omitempty"`
+	IsIrrevocable bool   `json:"isIrrevocable"`
+	*VPPAsset
+	*VPPUser
+}
+
+// LicenseAssociation describes an association between a (VPP user OR device serial) and a license
 type LicenseAssociation struct {
 	ClientUserIDStr string `json:"clientUserIdStr,omitempty"`
 	LicenseIDStr    string `json:"licenseIdStr,omitempty"`
@@ -29,12 +36,14 @@ type getVPPLicensesSrvResponse struct {
 	*VPPError
 }
 
+// LicensesService describes an interface that can manage VPP licenses
 type LicensesService interface {
 	GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, error)
 }
 
 type licensesService struct {
 	client *vppClient
+	sToken string
 }
 
 type getLicensesRequestOpts struct {
@@ -50,10 +59,6 @@ type GetLicensesOption func(*getLicensesRequestOpts) error
 // GetLicenses retrieves a list of available VPP licenses. The result can optionally be filtered by the application id
 // and/or its assigned status.
 func (s *licensesService) GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, error) {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return nil, err
-	}
 	requestOpts := &getLicensesRequestOpts{}
 	for _, option := range opts {
 		if err := option(requestOpts); err != nil {
@@ -62,7 +67,7 @@ func (s *licensesService) GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, 
 	}
 	var request *getVPPLicensesSrvRequest = &getVPPLicensesSrvRequest{
 		getLicensesRequestOpts: requestOpts,
-		SToken:                 sToken,
+		SToken:                 s.sToken,
 	}
 	var response getVPPLicensesSrvResponse
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.GetLicensesSrvURL, request)
@@ -108,6 +113,6 @@ type manageVPPLicensesByAdamIdSrvResponse struct {
 }
 
 // ManageLicenses is used for the bulk addition/removal of VPP licenses.
-//func (s *licensesService) ManageLicenses() error {
-//
-//}
+func (s *licensesService) ManageLicenses(asset *VPPAsset, associations []LicenseAssociation, disassociations []LicenseAssociation, notify bool) ([]LicenseAssociation, error) {
+
+}
