@@ -38,7 +38,7 @@ func NewUser(email string, id string) *VPPUser {
 type UsersService interface {
 	RegisterUser(user *VPPUser) (*VPPUser, error)
 	GetUser(*VPPUser) error
-	GetUsers(opts ...GetUsersOption) ([]VPPUser, error)
+	GetUsers(batch *BatchRequest, opts ...GetUsersOption) ([]VPPUser, error)
 	RetireUser(user *VPPUser) error
 	EditUser(user *VPPUser) error
 }
@@ -133,7 +133,6 @@ func (s *usersService) GetUser(user *VPPUser) error {
 }
 
 type getUsersRequestOpts struct {
-	*BatchRequestOpts
 	IncludeRetired int `json:"includeRetired"`
 }
 
@@ -155,6 +154,7 @@ func IncludeRetired(include bool) GetUsersOption {
 
 type getVPPUsersSrvRequest struct {
 	*getUsersRequestOpts
+	*BatchRequest
 	SToken string `json:"sToken"`
 }
 
@@ -168,7 +168,7 @@ type getVPPUsersSrvResponse struct {
 }
 
 // GetUsers obtains a list of all known users from the VPP server
-func (s *usersService) GetUsers(opts ...GetUsersOption) ([]VPPUser, error) {
+func (s *usersService) GetUsers(batch *BatchRequest, opts ...GetUsersOption) ([]VPPUser, error) {
 	requestOpts := &getUsersRequestOpts{}
 	for _, option := range opts {
 		if err := option(requestOpts); err != nil {
@@ -177,6 +177,7 @@ func (s *usersService) GetUsers(opts ...GetUsersOption) ([]VPPUser, error) {
 	}
 	var request *getVPPUsersSrvRequest = &getVPPUsersSrvRequest{
 		getUsersRequestOpts: requestOpts,
+		BatchRequest:        batch,
 		SToken:              s.sToken,
 	}
 	var response getVPPUsersSrvResponse
@@ -191,6 +192,10 @@ func (s *usersService) GetUsers(opts ...GetUsersOption) ([]VPPUser, error) {
 	if response.Status == StatusErr {
 		return nil, response.VPPError
 	}
+
+	batch.BatchToken = response.BatchToken
+	batch.SinceModifiedToken = response.SinceModifiedToken
+
 	return response.Users, nil
 }
 

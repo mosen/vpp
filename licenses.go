@@ -20,6 +20,7 @@ type LicenseAssociation struct {
 
 type getVPPLicensesSrvRequest struct {
 	*getLicensesRequestOpts
+	*BatchRequest
 	SToken string `json:"sToken"`
 }
 
@@ -35,6 +36,7 @@ type getVPPLicensesSrvResponse struct {
 type LicensesService interface {
 	GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, error)
 	AssociateLicense(user *VPPUser, license *VPPLicense) error
+	DisassociateLicense(user *VPPUser, license *VPPLicense) error
 }
 
 type licensesService struct {
@@ -43,7 +45,6 @@ type licensesService struct {
 }
 
 type getLicensesRequestOpts struct {
-	*BatchRequestOpts
 	AssignedOnly bool         `json:"assignedOnly,omitempty"`
 	AdamID       int          `json:"adamId,omitempty"`
 	PricingParam PricingParam `json:"pricingParam,omitempty"`
@@ -54,7 +55,7 @@ type GetLicensesOption func(*getLicensesRequestOpts) error
 
 // GetLicenses retrieves a list of available VPP licenses. The result can optionally be filtered by the application id
 // and/or its assigned status.
-func (s *licensesService) GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, error) {
+func (s *licensesService) GetLicenses(batch *BatchRequest, opts ...GetLicensesOption) ([]VPPLicense, error) {
 	requestOpts := &getLicensesRequestOpts{}
 	for _, option := range opts {
 		if err := option(requestOpts); err != nil {
@@ -64,6 +65,7 @@ func (s *licensesService) GetLicenses(opts ...GetLicensesOption) ([]VPPLicense, 
 	var request *getVPPLicensesSrvRequest = &getVPPLicensesSrvRequest{
 		getLicensesRequestOpts: requestOpts,
 		SToken:                 s.sToken,
+		BatchRequest:           batch,
 	}
 	var response getVPPLicensesSrvResponse
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.GetLicensesSrvURL, request)
