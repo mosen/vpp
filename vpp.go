@@ -110,7 +110,12 @@ func (c *vppClient) Do(req *http.Request, into interface{}) error {
 	if resp.StatusCode == http.StatusPermanentRedirect || resp.StatusCode == http.StatusTemporaryRedirect {
 		retryAfter := resp.Header.Get("Retry-After")
 		fmt.Printf("Retry-After %s", retryAfter)
-		if regexp.MatchString("[0-9]+", retryAfter) {
+		matched, err := regexp.MatchString("^[0-9]+$", retryAfter)
+		if err != nil {
+			return err
+		}
+
+		if matched {
 
 		} else {
 
@@ -120,10 +125,15 @@ func (c *vppClient) Do(req *http.Request, into interface{}) error {
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		retryAfter := resp.Header.Get("Retry-After")
 		fmt.Printf("Retry-After %s", retryAfter)
-		if regexp.MatchString("[0-9]+", retryAfter) {
+		matched, err := regexp.MatchString("^[0-9]+$", retryAfter)
+		if err != nil {
+			return err
+		}
 
+		if matched {
+			fmt.Println("Retry-After was in seconds")
 		} else {
-
+			//retryTime := time.Parse()
 		}
 
 	}

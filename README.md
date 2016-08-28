@@ -22,7 +22,7 @@ vpp is a client library for working with Apple's Volume Purchasing Program
 
 # TODO
 
-- Support `Retry-After` header.
+- Support `Retry-After` header. NOTE: The date format version of this doesn't match between doco and the simulator.
 - A nice way of retrieving licenses in batches.
 - Respect maxBatchAssociateLicenseCount and maxBatchDisassociateLicenseCount
 
