@@ -4,8 +4,12 @@ import "errors"
 
 // BatchResult represents a paged result
 type BatchResult interface {
-	Result() ([]interface{}, error)
+	Results() ([]interface{}, error)
 	HasNext() bool
+}
+
+type batchResult struct {
+	*BatchRequestOpts
 }
 
 // BatchRequestOpts is a structure that defines options available when fetching objects in batches (users/licenses)
