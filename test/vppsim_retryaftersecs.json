@@ -1,0 +1,9 @@
+{
+  "getVPPUsersSrv_responses": [
+    {
+      "count": 10,
+      "response": "service_unavailable",
+      "retry_after": "20"
+    }
+  ]
+}

@@ -14,7 +14,8 @@ func TestLicensesService_GetLicenses(t *testing.T) {
 		t.Error(err)
 	}
 
-	licenses, err := vppClient.GetLicenses()
+	batch := &BatchRequest{}
+	licenses, err := vppClient.GetLicenses(batch)
 	if err != nil {
 		t.Error(err)
 	}

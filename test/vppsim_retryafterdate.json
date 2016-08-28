@@ -1,0 +1,8 @@
+{
+  "getVPPUsersSrv_responses": [
+    {
+      "response": "service_unavailable",
+      "retry_after": "Fri, 31 Dec 1999 23:59:59 GMT"
+    }
+  ]
+}

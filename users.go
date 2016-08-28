@@ -61,14 +61,10 @@ type registerVPPUserSrvResponse struct {
 
 // RegisterUser registers a new VPP user
 func (s *usersService) RegisterUser(user *VPPUser) (*VPPUser, error) {
-	sToken, err := s.client.Config.SToken.Base64String()
-	if err != nil {
-		return nil, err
-	}
 	var response *registerVPPUserSrvResponse
 	var request *registerVPPUserSrvRequest = &registerVPPUserSrvRequest{
 		VPPUser: user,
-		SToken:  sToken,
+		SToken:  s.sToken,
 	}
 
 	req, err := s.client.NewRequest("POST", s.client.Config.serviceConfig.RegisterUserSrvURL, request)

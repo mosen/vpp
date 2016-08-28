@@ -2,7 +2,6 @@ package vpp
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 )
 
 const (
@@ -26,30 +26,9 @@ const (
 	StatusOk
 )
 
-type SToken struct {
-	Token      string `json:"token"`
-	ExpDateStr string `json:"expDate"`
-	OrgName    string `json:"orgName"`
-}
-
-func (t *SToken) Base64String() (string, error) {
-
-	jsonValue, err := json.Marshal(t)
-	if err != nil {
-		return "", err
-	}
-
-	buf := new(bytes.Buffer)
-	encoder := base64.NewEncoder(base64.StdEncoding, buf)
-	encoder.Write(jsonValue)
-	encoder.Close()
-
-	return string(buf.Bytes()), nil
-}
-
 type Config struct {
 	URL           *url.URL
-	SToken        *SToken
+	SToken        string
 	debug         bool
 	serviceConfig *ServiceConfig
 }
@@ -64,6 +43,9 @@ func (e VPPError) Error() string {
 }
 
 type VPPClient interface {
+	NewRequest(method, urlStr string, body interface{}) (*http.Request, error)
+	Do(req *http.Request, into interface{}) error
+
 	AssetsService
 	ConfigService
 	LicensesService
@@ -125,13 +107,26 @@ func (c *vppClient) Do(req *http.Request, into interface{}) error {
 	// if the service is overloaded or this client is causing too much load.
 	// The Retry-After header may be in seconds or as a date.
 
-	//if resp.StatusCode == http.StatusPermanentRedirect || resp.StatusCode == http.StatusTemporaryRedirect {
-	//	retryAfter := resp.Header.Get("Retry-After")
-	//}
-	//
-	//if resp.StatusCode == http.StatusServiceUnavailable {
-	//	retryAfter := resp.Header.Get("Retry-After")
-	//}
+	if resp.StatusCode == http.StatusPermanentRedirect || resp.StatusCode == http.StatusTemporaryRedirect {
+		retryAfter := resp.Header.Get("Retry-After")
+		fmt.Printf("Retry-After %s", retryAfter)
+		if regexp.MatchString("[0-9]+", retryAfter) {
+
+		} else {
+
+		}
+	}
+
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		retryAfter := resp.Header.Get("Retry-After")
+		fmt.Printf("Retry-After %s", retryAfter)
+		if regexp.MatchString("[0-9]+", retryAfter) {
+
+		} else {
+
+		}
+
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -164,12 +159,8 @@ func NewVPPClient(config *Config) (VPPClient, error) {
 	}
 
 	c := &vppClient{client: http.DefaultClient, BaseURL: config.URL, Config: config}
-	sToken, err := config.SToken.Base64String()
-	if err != nil {
-		return nil, err
-	}
 
-	c.configService = configService{client: c, sToken: sToken}
+	c.configService = configService{client: c, sToken: config.SToken}
 
 	serviceConfig, err := c.ServiceConfig()
 	if err != nil {
@@ -177,10 +168,10 @@ func NewVPPClient(config *Config) (VPPClient, error) {
 	}
 	c.Config.serviceConfig = serviceConfig
 
-	c.assetsService = assetsService{client: c, sToken: sToken}
-	c.licensesService = licensesService{client: c, sToken: sToken}
-	c.metadataService = metadataService{client: c, sToken: sToken}
-	c.usersService = usersService{client: c, sToken: sToken}
+	c.assetsService = assetsService{client: c, sToken: config.SToken}
+	c.licensesService = licensesService{client: c, sToken: config.SToken}
+	c.metadataService = metadataService{client: c, sToken: config.SToken}
+	c.usersService = usersService{client: c, sToken: config.SToken}
 
 	return c, nil
 }
