@@ -108,6 +108,7 @@ type manageVPPLicensesByAdamIdSrvResponse struct {
 	Disassociations []LicenseAssociation `json:"disassociations,omitempty"`
 }
 
+// licenseOperations describes a list of operations on a single asset (app or book).
 type licenseOperations struct {
 	Asset *VPPAsset
 
@@ -126,7 +127,7 @@ func (op *licenseOperations) NewLicenseOperations(asset *VPPAsset) licenseOperat
 	}
 }
 
-// AssignUser adds a VPP user to the list of license holders
+// AssignUser adds a VPP user to the list of license holders for the current asset.
 func (op *licenseOperations) AssignUser(user *VPPUser) error {
 	if len(op.AssociateSerialNumbers) > 0 {
 		return errors.New("you cannot assign licenses to both users and devices in the same license operation")
@@ -136,6 +137,7 @@ func (op *licenseOperations) AssignUser(user *VPPUser) error {
 	return nil
 }
 
+// AssignSerialNumber adds a device to the list of license holders for the current asset.
 func (op *licenseOperations) AssignSerialNumber(serialNumber string) error {
 	if len(op.AssociateUsers) > 0 {
 		return errors.New("you cannot assign licenses to both users and devices in the same license operation")
@@ -145,16 +147,39 @@ func (op *licenseOperations) AssignSerialNumber(serialNumber string) error {
 	return nil
 }
 
+// UnassignUser removes a VPP user from the list of license holders for the current asset.
 func (op *licenseOperations) UnassignUser(user *VPPUser) error {
+	if len(op.DisassociateSerialNumbers) > 0|len(op.DisassociateLicenseIDs) > 0 {
+		return errors.New("you can only unassign licenses from either users, serial numbers, or license ids in a single operation")
+	}
 
+	op.DisassociateUsers = append(op.DisassociateUsers, user)
+	return nil
 }
 
+// UnassignSerialNumber removes a device from the list of license holders for the current asset.
 func (op *licenseOperations) UnassignSerialNumber(serialNumber string) error {
+	if len(op.DisassociateUsers) > 0|len(op.DisassociateLicenseIDs) > 0 {
+		return errors.New("you can only unassign licenses from either users, serial numbers, or license ids in a single operation")
+	}
 
+	op.DisassociateSerialNumbers = append(op.DisassociateSerialNumbers, serialNumber)
+	return nil
+}
+
+// UnassignLicenseID removes a VPP license by its identifier.
+func (op *licenseOperations) UnassignLicenseID(licenseID string) error {
+	if len(op.DisassociateUsers) > 0|len(op.DisassociateSerialNumbers) > 0 {
+		return errors.New("you can only unassign licenses from either users, serial numbers, or license ids in a single operation")
+	}
+
+	op.DisassociateLicenseIDs = append(op.DisassociateLicenseIDs, licenseID)
+	return nil
 }
 
 // ManageLicenses is used for the bulk addition/removal of VPP licenses.
-//func (s *licensesService) ManageLicenses(asset *VPPAsset, associations []LicenseAssociation, disassociations []LicenseAssociation, notify bool) ([]LicenseAssociation, error) {
+// The notify argument controls whether the user will be notified of the removal.
+//func (s *licensesService) ManageLicenses(operations *licenseOperations, notify bool) ([]LicenseAssociation, error) {
 //
 //}
 

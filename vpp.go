@@ -116,11 +116,22 @@ func (c *vppClient) NewRequest(method, urlStr string, body interface{}) (*http.R
 
 // Do sends an API request and returns the API response.
 func (c *vppClient) Do(req *http.Request, into interface{}) error {
-	// perform request
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
+
+	// The VPP service may issue either a 3xx (redirect) or 503 (unavailable) with a Retry-After header
+	// if the service is overloaded or this client is causing too much load.
+	// The Retry-After header may be in seconds or as a date.
+
+	//if resp.StatusCode == http.StatusPermanentRedirect || resp.StatusCode == http.StatusTemporaryRedirect {
+	//	retryAfter := resp.Header.Get("Retry-After")
+	//}
+	//
+	//if resp.StatusCode == http.StatusServiceUnavailable {
+	//	retryAfter := resp.Header.Get("Retry-After")
+	//}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
